@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Container from "../components/Container";
 import WhatsAppButton from "../components/WhatsAppButton";
+import { SpeedInsights } from "@vercel/speed-insights/next"; // ⬅️ LA ÎNCEPUT, cu celelalte importuri
 
 export const metadata = {
   metadataBase: new URL("https://egodentlab.co.uk"),
