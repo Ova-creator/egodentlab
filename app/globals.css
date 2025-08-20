@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === GLOBAL SINGLE BACKGROUND === */
+:root {
+  --egodent-bg: url("/bg.jpg"); /* place bg.jpg in /public */
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  @apply text-white antialiased;
+  background-image: var(--egodent-bg);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+/* dark overlay for readability */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.85) 100%);
+  z-index: -1;
+}
+
+/* frosted card (poți folosi în alte locuri) */
+.card {
+  @apply bg-black/40 backdrop-blur-md rounded-2xl shadow-lg ring-1 ring-white/10;
+}
+
+/* panou mai „light” pentru home (mai aerisit, contrast mai mic) */
+/* panel: softer glass look for hero/about */
+.panel {
+  @apply bg-black/30 backdrop-blur-[6px] rounded-2xl shadow-2xl ring-1 ring-white/10;
+}
+
