@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Container from "../components/Container";
 import WhatsAppButton from "../components/WhatsAppButton";
+import { SpeedInsights } from "@vercel/speed-insights/next"; // ✅ Vercel Speed Insights
 
 export const metadata = {
   metadataBase: new URL("https://egodentlab.co.uk"),
@@ -25,7 +26,6 @@ export const metadata = {
   },
   alternates: { canonical: "/" },
   icons: { icon: "/logo.png" },
-  // Prevent iOS from auto-wrapping phone/email/address and breaking hydration.
   formatDetection: { telephone: false, address: false, email: false },
 };
 
@@ -47,29 +47,9 @@ export default function RootLayout({ children }) {
         </main>
 
         <WhatsAppButton />
-
         <Footer />
-		 <script
-  type="application/ld+json"
-  dangerouslySetInnerHTML={{
-    __html: JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      name: "EgoDent Lab",
-      url: "https://egodentlab.co.uk",
-      logo: "https://egodentlab.co.uk/logo.png",
-      contactPoint: [{
-        "@type": "ContactPoint",
-        contactType: "customer support",
-        email: "lab@egodent.co.uk",
-        telephone: "+44 203 301 6323",
-        areaServed: "GB",
-        availableLanguage: ["en"]
-      }],
-      sameAs: [] // le adăugăm când ai social-urile
-    }),
-  }}
-/>
+
+        <SpeedInsights /> {/* 👈 plasat jos în <body>, global pe toate paginile */}
       </body>
     </html>
   );
