@@ -1,12 +1,16 @@
+// app/layout.js
 import "./globals.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Container from "../components/Container";
 import WhatsAppButton from "../components/WhatsAppButton";
-import { SpeedInsights } from "@vercel/speed-insights/next"; // ✅ Vercel Speed Insights
+import { SpeedInsights } from "@vercel/speed-insights/next";
+
+// Domeniul devine dinamic (preview sau producție)
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://egodentlab.vercel.app";
 
 export const metadata = {
-  metadataBase: new URL("https://egodentlab.co.uk"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "EgoDent Lab | Digital Dentistry, London",
     template: "%s | EgoDent Lab",
@@ -15,7 +19,7 @@ export const metadata = {
     "Premium digital dental lab in London: CAD/CAM planning, implant and restorative workflows, and fast, predictable outcomes.",
   openGraph: {
     type: "website",
-    url: "/",
+    url: "/", // devine absolut cu metadataBase
     title: "EgoDent Lab | Digital Dentistry, London",
     description:
       "Premium digital dental lab in London: CAD/CAM planning, implant and restorative workflows, and fast, predictable outcomes.",
@@ -26,6 +30,7 @@ export const metadata = {
   },
   alternates: { canonical: "/" },
   icons: { icon: "/logo.png" },
+  // iOS fix (evită auto-link la tel/email/adresă care strică hydration)
   formatDetection: { telephone: false, address: false, email: false },
 };
 
@@ -49,7 +54,7 @@ export default function RootLayout({ children }) {
         <WhatsAppButton />
         <Footer />
 
-        <SpeedInsights /> {/* 👈 plasat jos în <body>, global pe toate paginile */}
+        <SpeedInsights />
       </body>
     </html>
   );
