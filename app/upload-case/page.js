@@ -14,7 +14,7 @@ export const metadata = {
 export default function Page() {
   const channels = [
     {
-      name: "WeTransfer (preferred UK)",
+      name: "WeTransfer",
       href: "https://wetransfer.com/",
       desc: "Drag & drop your files. Add patient ID, shade, and due date in the message.",
     },

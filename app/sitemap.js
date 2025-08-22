@@ -1,21 +1,22 @@
-export default async function sitemap() {
-  const base = "https://egodentlab.co.uk";
-  const routes = [
-    "",
+export default function sitemap() {
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://egodentlab.vercel.app";
+  const now = new Date().toISOString();
+  const paths = [
+    "/",
     "/digital-dentistry",
     "/implant-dentistry",
-    "/workflow",
     "/additional-services",
+    "/workflow",
+    "/gallery",
     "/upload-case",
     "/contact-us",
-    "/gallery",
-    "/lab-to-lab", // 👈 new
+    "/lab-to-lab",
   ];
-  const lastModified = new Date();
-  return routes.map((route) => ({
-    url: `${base}${route}`,
-    lastModified,
+
+  return paths.map((p) => ({
+    url: `${base}${p === "/" ? "/" : p}`,
+    lastModified: now,
     changeFrequency: "weekly",
-    priority: route === "" ? 1.0 : 0.8,
+    priority: p === "/" ? 1 : 0.7,
   }));
 }

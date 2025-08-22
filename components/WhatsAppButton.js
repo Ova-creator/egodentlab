@@ -1,37 +1,26 @@
-"use client";
-
+// components/WhatsAppButton.js
 export default function WhatsAppButton() {
-  // Linkul tău direct (fără +, exact cum l-ai dat):
-  const href = "https://wa.me/447892720676";
-
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label="WhatsApp"
-      className="fixed right-4 md:right-6"
-      style={{ bottom: `calc(16px + env(safe-area-inset-bottom))`, zIndex: 60 }}
-    >
-      <span className="inline-flex items-center gap-2 px-3 py-2 md:px-4 md:py-3 rounded-full bg-[#25D366] text-black font-semibold shadow-lg ring-1 ring-black/10 hover:scale-[1.03] transition">
-        <WhatsAppIcon className="w-5 h-5 md:w-6 md:h-6" />
-        <span className="hidden sm:inline">WhatsApp</span>
-      </span>
-    </a>
-  );
-}
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-3">
+      {/* CALL – vizibil sub 1024px (telefon/tabletă) */}
+      <a
+        href="tel:+442033016323" // 0203 301 6323
+        className="lg:hidden inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-white shadow-lg ring-1 ring-white/20 backdrop-blur hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        aria-label="Call EgoDent Lab"
+      >
+        Call
+      </a>
 
-function WhatsAppIcon(props) {
-  return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" {...props}>
-      <path
-        d="M16 3C9.4 3 4 8.4 4 15c0 2.2.6 4.2 1.7 6L4 29l8.2-1.7c1.7.9 3.6 1.4 5.8 1.4 6.6 0 12-5.4 12-12S22.6 3 16 3z"
-        fill="currentColor"
-      />
-      <path
-        d="M12.7 10.9c-.3-.7-.6-.7-.9-.7h-.8c-.3 0-.8.1-1.2.6-.4.4-1.6 1.6-1.6 3.9 0 2.3 1.6 4.5 1.8 4.8.2.3 3.2 5.1 8 6.9 4 .9 4.8.8 5.7.7.9-.1 2.8-1.1 3.2-2.2.4-1.1.4-2 .3-2.2-.1-.2-.4-.3-.9-.5-.5-.2-2.8-1.4-3.2-1.6-.4-.1-.7-.2-1 .2-.3.4-1.1 1.6-1.4 1.9-.3.3-.5.3-1 .1-.5-.2-2-.7-3.8-2.1-1.4-1-2.3-2.2-2.6-2.6-.3-.4 0-.6.2-.8.2-.2.4-.5.6-.7.2-.2.3-.4.4-.6.1-.2 0-.4 0-.6 0-.2-.9-2.2-1.2-3z"
-        fill="#fff"
-      />
-    </svg>
+      {/* WHATSAPP – vizibil peste tot */}
+      <a
+        href="https://wa.me/447311172297" // 07311172297 -> format internațional fără 0
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 rounded-full bg-green-500 px-4 py-2 text-white shadow-lg hover:bg-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300"
+        aria-label="WhatsApp EgoDent Lab"
+      >
+        WhatsApp
+      </a>
+    </div>
   );
 }
