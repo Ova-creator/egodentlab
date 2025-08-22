@@ -13,7 +13,7 @@ const query = `
 `;
 
 export default async function GalleryPage() {
-  const images = await sanityFetch(query);
+  const images = (await sanityFetch(query)) || [];
 
   return (
     <Container>
