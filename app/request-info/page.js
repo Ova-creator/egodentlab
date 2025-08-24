@@ -1,4 +1,4 @@
-import RequestForm from "../../components/RequestForm";
+import RequestForm from "./RequestForm";
 
 
 export const metadata = {
