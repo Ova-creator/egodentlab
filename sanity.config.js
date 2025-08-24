@@ -1,8 +1,7 @@
-// sanity.config.js
+// sanity.config.js (la root)
 import { defineConfig } from "sanity";
 import { structureTool } from "sanity/structure";
 import { visionTool } from "@sanity/vision";
-// adjust this path if your schemas live elsewhere:
 import schemas from "./sanity/schemas";
 
 const projectId =
