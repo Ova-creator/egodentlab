@@ -1,8 +1,11 @@
 // app/admin/[[...index]]/page.js
-import { Studio } from "sanity";
-import config from "../../../sanity/sanity.config";
+import dynamic from "next/dynamic";
 
-export const dynamic = "force-static"; // ok pt Vercel
+export const dynamic = "force-static"; // ok for Studio hosting
+
+// Load the client-only Studio with no SSR to avoid client-boundary export issues
+const StudioClient = dynamic(() => import("./StudioClient"), { ssr: false });
+
 export default function AdminPage() {
-  return <Studio config={config} />;
+  return <StudioClient />;
 }
