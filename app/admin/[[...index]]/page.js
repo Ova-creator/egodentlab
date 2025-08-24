@@ -1,12 +1,8 @@
-"use client";
-
+// app/admin/[[...index]]/page.js
 import { Studio } from "sanity";
-import config from "../../../sanity.config";
+import config from "../../../sanity/sanity.config";
 
+export const dynamic = "force-static"; // ok pt Vercel
 export default function AdminPage() {
-  return (
-    <div className="min-h-[70vh]">
-      <Studio config={config} />
-    </div>
-  );
+  return <Studio config={config} />;
 }

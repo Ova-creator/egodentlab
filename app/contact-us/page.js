@@ -19,6 +19,7 @@ export default function Page() {
     "Clinic/Doctor:%20%0A" +
     "Preferred%20callback%20time:%20%0A%0A" +
     "Thank%20you!%0A";
+
   const telHref = "tel:+442033016323";
   const mapsHref = "https://maps.google.com/?q=HA7+1ER+Stanmore+London";
 
@@ -41,7 +42,7 @@ export default function Page() {
     openingHoursSpecification: [
       {
         "@type": "OpeningHoursSpecification",
-        dayOfWeek: ["Monday","Tuesday","Wednesday","Thursday","Friday"],
+        dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         opens: "09:00",
         closes: "18:00",
       },
@@ -67,6 +68,8 @@ export default function Page() {
         <p className="mt-5 text-white/85 text-lg">
           Questions about cases, timelines, or submissions? We’re here to help.
         </p>
+
+        {/* CTA buttons */}
         <div className="mt-7 flex flex-wrap justify-center gap-3">
           <a href="/upload-case" className="px-6 py-3.5 rounded-2xl bg-white text-black font-semibold">
             Start a Case
@@ -75,6 +78,14 @@ export default function Page() {
             Email Us
           </a>
         </div>
+
+        {/* ✅ ADD THIS SMALL LINE UNDER THE BUTTONS */}
+        <p className="mt-4 text-sm text-white/80">
+          Need the price list or order form?{" "}
+          <a href="/request-info" className="underline hover:text-white">
+            Request them here
+          </a>.
+        </p>
       </div>
 
       {/* CONTACT CARDS */}

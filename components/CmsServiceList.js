@@ -2,9 +2,9 @@ import Link from "next/link";
 import { sanityClient } from "../lib/sanity.client";
 import { servicesByCategoryQuery } from "../lib/queries";
 
-export default async function CmsServiceList({ category, debug = false }) {
-  if (!category) return null;
-
+export default function CmsServiceList() {
+  return null; // am renunțat la listarea automată din Sanity pe pagini
+}
   const fetchOpts =
     process.env.NODE_ENV === "development"
       ? { cache: "no-store" }        // bypass cache în DEV
