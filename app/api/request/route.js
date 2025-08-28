@@ -1,73 +1,124 @@
-import nodemailer from "nodemailer";
-import { NextResponse } from "next/server";
+import { google } from 'googleapis';
+import { sendEgoDentEmail } from '../../../lib/email';
+
+export const runtime = 'nodejs';
+
+function json(status, obj) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function normalizeBody(body) {
+  const clinic = (body.clinic || body.name || '').trim();
+  const email  = (body.email || '').trim();
+  const phone  = (body.phone || '').trim();
+  const needs  = Array.isArray(body.needs) ? body.needs : [];
+  const message = (body.message || '').trim();
+  return { clinic, email, phone, needs, message };
+}
+
+async function sheetsAppendRow({ clinic, email, phone, needs, message, ua, origin }) {
+  const auth = new google.auth.JWT(
+    process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    undefined,
+    (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+    ['https://www.googleapis.com/auth/spreadsheets']
+  );
+  const sheets = google.sheets({ version: 'v4', auth });
+  const spreadsheetId = process.env.SHEETS_SPREADSHEET_ID;
+
+  const header = ['Timestamp','Clinic','Email','Phone','Needs','Message','UserAgent','Origin'];
+  const values = [[
+    new Date().toISOString(),
+    clinic,
+    email,
+    phone,
+    needs.join(', '),
+    message,
+    ua || '',
+    origin || '',
+  ]];
+
+  // asigurăm headerul pe foaia "Requests"
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      valueInputOption: 'RAW',
+      data: [{
+        range: 'Requests!A1:H1',
+        values: [header],
+      }],
+    },
+  });
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: 'Requests!A2',
+    valueInputOption: 'RAW',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: { values },
+  });
+}
+
+export async function GET(req) {
+  try {
+    const url = new URL(req.url);
+    const diag = url.searchParams.get('email');
+    if (diag === 'diag') {
+      return json(200, {
+        ok: true,
+        provider: process.env.EMAIL_PROVIDER || 'resend',
+        from: process.env.NOTIFY_FROM,
+        to: (process.env.NOTIFY_TO || '').split(',').map(s => s.trim()).filter(Boolean),
+        keyLen: (process.env.RESEND_API_KEY || '').length,
+      });
+    }
+    return json(200, { ok: true, health: 'request-endpoint' });
+  } catch (e) {
+    return json(500, { ok: false, error: String(e) });
+  }
+}
 
 export async function POST(req) {
   try {
-    const data = await req.json();
+    const ua = req.headers.get('user-agent') || '';
+    const origin = req.headers.get('origin') || '';
+    const body = await req.json().catch(() => null);
+    if (!body) return json(400, { ok: false, error: 'bad_json' });
 
-    // Minimal validation
-    if (!data?.email || !data?.name) {
-      return NextResponse.json(
-        { ok: false, error: "Name and Email are required." },
-        { status: 400 }
-      );
+    const data = normalizeBody(body);
+
+    if (!data.clinic || !data.email) {
+      return json(400, { ok: false, error: 'clinic_email_required' });
+    }
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email);
+    if (!emailOk) {
+      return json(400, { ok: false, error: 'invalid_email' });
     }
 
-    const selected = Array.isArray(data.requests) && data.requests.length
-      ? data.requests.join(", ")
-      : "General request";
+    // 1) Sheets
+    await sheetsAppendRow({ ...data, ua, origin });
 
-    const subject = `Website request: ${selected}`;
+    // 2) Email
+    let emailed = false;
+    try {
+      await sendEgoDentEmail({
+        clinic: data.clinic,
+        email: data.email,
+        phone: data.phone,
+        needs: data.needs,
+        message: data.message,
+        sheetUrl: `https://docs.google.com/spreadsheets/d/${process.env.SHEETS_SPREADSHEET_ID}/edit`,
+      });
+      emailed = true;
+    } catch (e) {
+      emailed = false; // nu blocăm succesul din cauza emailului
+    }
 
-    const html = `
-      <h2>New request from website</h2>
-      <p><b>Name:</b> ${data.name}</p>
-      <p><b>Clinic/Practice:</b> ${data.clinic || "-"}</p>
-      <p><b>Email:</b> ${data.email}</p>
-      <p><b>Phone:</b> ${data.phone || "-"}</p>
-      <p><b>Requested:</b> ${selected}</p>
-      <p><b>Message:</b><br/>${(data.message || "").replace(/\n/g, "<br/>")}</p>
-      <hr/>
-      <p><i>GDPR:</i> ${data.newsletter ? "User opted-in for email updates." : "No newsletter opt-in."}</p>
-    `;
-
-    const text = `
-New request from website
-Name: ${data.name}
-Clinic/Practice: ${data.clinic || "-"}
-Email: ${data.email}
-Phone: ${data.phone || "-"}
-Requested: ${selected}
-Message:
-${data.message || "-"}
-
-GDPR: ${data.newsletter ? "newsletter opt-in" : "no opt-in"}
-    `.trim();
-
-    // SMTP transport
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: String(process.env.SMTP_PORT) === "465",
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-
-    const to = process.env.CONTACT_TO || "lab@egodent.co.uk";
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || "EgoDent Lab <lab@egodent.co.uk>",
-      to,
-      subject,
-      text,
-      html,
-      replyTo: data.email, // so you can reply directly
-    });
-
-    return NextResponse.json({ ok: true });
+    return json(200, { ok: true, emailed });
   } catch (err) {
-    console.error("REQUEST EMAIL ERROR:", err);
-    return NextResponse.json({ ok: false, error: "send_failed" }, { status: 500 });
+    return json(500, { ok: false, error: String(err) });
   }
 }
