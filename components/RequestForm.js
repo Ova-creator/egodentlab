@@ -1,142 +1,92 @@
-"use client";
-
-import { useState } from "react";
+'use client';
+import { useState } from 'react';
 
 export default function RequestForm() {
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    clinic: '',
+    email: '',
+    phone: '',
+    needs: {
+      'Price List': true,
+      'Order Form (Lab Ticket)': false,
+      'Starter Pack Labels': false,
+      'Courier Collection Setup': false,
+    },
+    message: '',
+    updates: false,
+  });
+  const [status, setStatus] = useState({ loading:false, error:null, success:false, note:null });
 
-  const FORMSPREE_ENDPOINT =
-    process.env.NEXT_PUBLIC_FORMSPREE_ENDPOINT || "";
+  async function handleSubmit() {
+    if (status.loading) return;
+    setStatus({ loading:true, error:null, success:false, note:null });
 
-  async function onSubmit(e) {
-    e.preventDefault();
-    setSending(true);
-    setSent(false);
-    setError("");
-
-    // Dacă endpoint-ul nu e setat, nu trimitem nicăieri
-    if (!FORMSPREE_ENDPOINT) {
-      setSending(false);
-      setError("Missing NEXT_PUBLIC_FORMSPREE_ENDPOINT");
-      return;
-    }
-
-    const form = new FormData(e.currentTarget);
     const payload = {
-      name: form.get("name") || "",
-      clinic: form.get("clinic") || "",
-      email: form.get("email") || "",
-      phone: form.get("phone") || "",
-      needs: [
-        form.get("need_price") ? "Price List" : null,
-        form.get("need_labels") ? "Starter Pack Labels" : null,
-        form.get("need_ticket") ? "Order Form (Lab Ticket)" : null,
-        form.get("need_courier") ? "Courier Collection Setup" : null,
-      ].filter(Boolean),
-      message: form.get("message") || "",
-      marketingOptIn: !!form.get("optin"),
-      _subject: "EgoDent Lab — Info Request",
-      _origin: typeof window !== "undefined" ? window.location.origin : "",
+      clinic: form.clinic || '',
+      email: form.email || '',
+      phone: form.phone || '',
+      needs: Object.entries(form.needs).filter(([,v]) => v).map(([k]) => k),
+      message: form.message || '',
+      website: '' // honeypot server-side
     };
 
     try {
-      const res = await fetch(FORMSPREE_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+      const res = await fetch('/api/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      // Formspree răspunde 200/OK pe succes
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(`Formspree responded ${res.status}: ${txt}`);
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch { throw new Error('bad_json'); }
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || 'network_error');
       }
 
-      setSent(true);
-      (e.currentTarget).reset();
+      setStatus({
+        loading:false,
+        error:null,
+        success:true,
+        note: json.emailed ? null : 'Saved. Email queued/temporary issue.',
+      });
     } catch (err) {
-      console.error("request-info send failed:", err);
-      setError("send_failed");
-    } finally {
-      setSending(false);
+      setStatus({ loading:false, error: err?.message || 'network_error', success:false, note:null });
     }
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
-      {/* Name / Clinic */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="label">Name*</label>
-          <input required name="name" className="input" placeholder="Dr. Jane Doe" />
-        </div>
-        <div>
-          <label className="label">Clinic / Practice</label>
-          <input name="clinic" className="input" placeholder="Smile Dental" />
-        </div>
+    <div className="space-y-4">{/* NOTĂ: fără <form> => imposibil fallback nativ */}
+      {/* Name / Clinic / Email / Phone etc. — lasă-ți câmpurile existente */}
+      {/* Exemple scurte (adaptează cu UI-ul tău): */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <label className="block">
+          <span className="text-sm opacity-80">Clinic / Practice</span>
+          <input className="mt-1 w-full bg-black/20 px-3 py-2 rounded"
+                 value={form.clinic}
+                 onChange={e=>setForm(f=>({...f, clinic:e.target.value}))}/>
+        </label>
+        <label className="block">
+          <span className="text-sm opacity-80">Email</span>
+          <input className="mt-1 w-full bg-black/20 px-3 py-2 rounded"
+                 value={form.email}
+                 onChange={e=>setForm(f=>({...f, email:e.target.value}))}/>
+        </label>
       </div>
 
-      {/* Email / Phone */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="label">Email*</label>
-          <input required type="email" name="email" className="input" placeholder="you@clinic.co.uk" />
-        </div>
-        <div>
-          <label className="label">Phone</label>
-          <input name="phone" className="input" placeholder="07..." />
-        </div>
-      </div>
+      {/* … restul câmpurilor tale … */}
 
-      {/* Needs checklist */}
-      <div>
-        <p className="mb-2 text-white/90">What do you need?</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 panel p-4 ring-1 ring-white/10">
-          <label className="flex items-center gap-3">
-            <input type="checkbox" name="need_price" className="checkbox" />
-            <span>Price List</span>
-          </label>
-          <label className="flex items-center gap-3">
-            <input type="checkbox" name="need_labels" className="checkbox" />
-            <span>Starter Pack Labels</span>
-          </label>
-          <label className="flex items-center gap-3">
-            <input type="checkbox" name="need_ticket" className="checkbox" />
-            <span>Order Form (Lab Ticket)</span>
-          </label>
-          <label className="flex items-center gap-3">
-            <input type="checkbox" name="need_courier" className="checkbox" />
-            <span>Courier Collection Setup</span>
-          </label>
-        </div>
-      </div>
+      <button type="button"
+              onClick={handleSubmit}
+              disabled={status.loading}
+              className="rounded bg-white/10 hover:bg-white/20 px-4 py-2">
+        {status.loading ? 'Sending…' : 'Send request'}
+      </button>
 
-      {/* Message */}
-      <div>
-        <label className="label">Message</label>
-        <textarea name="message" rows={5} className="textarea" placeholder="Anything specific?"></textarea>
-      </div>
-
-      {/* Opt-in */}
-      <label className="flex items-center gap-3">
-        <input type="checkbox" name="optin" className="checkbox" />
-        <span>I’d like occasional updates by email.</span>
-      </label>
-
-      {/* Submit */}
-      <div className="flex items-center gap-4">
-        <button
-          disabled={sending}
-          className="px-6 py-3 rounded-2xl bg-white text-black font-semibold disabled:opacity-50"
-        >
-          {sending ? "Sending..." : "Send request"}
-        </button>
-
-        {sent && <span className="text-emerald-400">Thanks! We’ll email you shortly.</span>}
-        {error && <span className="text-rose-400">Error: {error}</span>}
-      </div>
-    </form>
+      {status.success && <p className="text-green-500 mt-2">Thanks! We’ll email you shortly.</p>}
+      {status.note && <p className="text-amber-500 mt-1">{status.note}</p>}
+      {status.error && <p className="text-red-500 mt-2">Error: {status.error}</p>}
+    </div>
   );
 }
