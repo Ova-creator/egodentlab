@@ -1,73 +1,143 @@
-import nodemailer from "nodemailer";
-import { NextResponse } from "next/server";
+export const runtime = 'nodejs';
 
-export async function POST(req) {
+import { google } from 'googleapis';
+import fs from 'fs';
+import path from 'path';
+import { sendEgoDentEmail } from '../../../lib/email';
+
+// ---------- CORS helpers ----------
+function allowedOrigin() {
+  // în dev: * ; în prod setează https://egodentlab.vercel.app
+  return process.env.NEXT_PUBLIC_SITE_URL || '*';
+}
+function jsonHeaders() {
+  return {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': allowedOrigin(),
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Cache-Control': 'no-store',
+  };
+}
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: jsonHeaders() });
+}
+
+// ---------- Google Sheets helpers ----------
+function sanitizeKey(k) {
+  if (!k) return '';
+  return k.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+}
+function loadGoogleCreds() {
+  const envEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '';
+  const envKey   = sanitizeKey(process.env.GOOGLE_PRIVATE_KEY || '');
+  const envOk = envEmail.includes('.iam.gserviceaccount.com') && envKey.includes('BEGIN PRIVATE KEY');
+
+  if (envOk) return { clientEmail: envEmail, privateKey: envKey, source: 'env' };
+
+  // fallback la keys/sa.json doar dacă ENV nu e valid
   try {
-    const data = await req.json();
+    const saPath = path.join(process.cwd(), 'keys', 'sa.json');
+    const sa = JSON.parse(fs.readFileSync(saPath, 'utf8'));
+    return { clientEmail: sa.client_email || '', privateKey: sanitizeKey(sa.private_key || ''), source: 'file' };
+  } catch {
+    throw new Error('No valid Google credentials found (ENV nor keys/sa.json).');
+  }
+}
+async function makeSheetsClient() {
+  const spreadsheetId = process.env.SHEETS_SPREADSHEET_ID || '';
+  if (!spreadsheetId) throw new Error('Missing SHEETS_SPREADSHEET_ID');
 
-    // Minimal validation
-    if (!data?.email || !data?.name) {
-      return NextResponse.json(
-        { ok: false, error: "Name and Email are required." },
-        { status: 400 }
-      );
+  const { clientEmail, privateKey } = loadGoogleCreds();
+  const auth = new google.auth.GoogleAuth({
+    credentials: { client_email: clientEmail, private_key: privateKey },
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+  const client = await auth.getClient();
+  return { sheets: google.sheets({ version: 'v4', auth: client }), spreadsheetId };
+}
+
+// ---------- GET (health & diag) ----------
+export async function GET(req) {
+  try {
+    const url = new URL(req.url);
+
+    if (url.searchParams.get('email') === 'diag') {
+      const from = (process.env.NOTIFY_FROM || '').trim() || 'onboarding@resend.dev';
+      const to = (process.env.NOTIFY_TO || '').split(',').map(s => s.trim()).filter(Boolean);
+      const keyLen = (process.env.RESEND_API_KEY || '').length;
+      return new Response(JSON.stringify({ ok: true, provider: 'resend', from, to, keyLen }), {
+        status: 200, headers: jsonHeaders(),
+      });
     }
 
-    const selected = Array.isArray(data.requests) && data.requests.length
-      ? data.requests.join(", ")
-      : "General request";
+    return new Response(JSON.stringify({ ok: true, health: 'request-endpoint' }), {
+      status: 200, headers: jsonHeaders(),
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ ok: false, error: String(e) }), {
+      status: 500, headers: jsonHeaders(),
+    });
+  }
+}
 
-    const subject = `Website request: ${selected}`;
+// ---------- POST (save to Sheets + send email) ----------
+export async function POST(req) {
+  try {
+    const raw = await req.text();
+    let body = {};
+    try { body = raw ? JSON.parse(raw) : {}; }
+    catch { return new Response(JSON.stringify({ ok:false, error:'Invalid JSON' }), { status:400, headers: jsonHeaders() }); }
 
-    const html = `
-      <h2>New request from website</h2>
-      <p><b>Name:</b> ${data.name}</p>
-      <p><b>Clinic/Practice:</b> ${data.clinic || "-"}</p>
-      <p><b>Email:</b> ${data.email}</p>
-      <p><b>Phone:</b> ${data.phone || "-"}</p>
-      <p><b>Requested:</b> ${selected}</p>
-      <p><b>Message:</b><br/>${(data.message || "").replace(/\n/g, "<br/>")}</p>
-      <hr/>
-      <p><i>GDPR:</i> ${data.newsletter ? "User opted-in for email updates." : "No newsletter opt-in."}</p>
-    `;
+    // honeypot (anti-spam)
+    if (body.website) {
+      return new Response(JSON.stringify({ ok:true, saved:false, spam:true }), { status:200, headers: jsonHeaders() });
+    }
 
-    const text = `
-New request from website
-Name: ${data.name}
-Clinic/Practice: ${data.clinic || "-"}
-Email: ${data.email}
-Phone: ${data.phone || "-"}
-Requested: ${selected}
-Message:
-${data.message || "-"}
+    const { sheets, spreadsheetId } = await makeSheetsClient();
 
-GDPR: ${data.newsletter ? "newsletter opt-in" : "no opt-in"}
-    `.trim();
+    const values = [[
+      new Date().toISOString(),
+      body.clinic || '',
+      body.email || '',
+      body.phone || '',
+      Array.isArray(body.needs) ? body.needs.join(', ') : (body.needs || ''),
+      body.message || '',
+    ]];
 
-    // SMTP transport
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: String(process.env.SMTP_PORT) === "465",
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: 'Requests!A1',
+      valueInputOption: 'RAW',           // NU transforma "+44 ..." în formulă
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values },
     });
 
-    const to = process.env.CONTACT_TO || "lab@egodent.co.uk";
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || "EgoDent Lab <lab@egodent.co.uk>",
-      to,
-      subject,
-      text,
-      html,
-      replyTo: data.email, // so you can reply directly
-    });
+    // ---- email (nu blochează salvarea) ----
+    let emailed = false;
+    let emailError = null;
+    try {
+      const needsText = Array.isArray(body.needs) ? body.needs.join(', ') : (body.needs || '');
+      await sendEgoDentEmail({
+        clinic: body.clinic,
+        email: body.email,
+        phone: body.phone,
+        needs: needsText,
+        message: body.message,
+        sheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+      });
+      emailed = true;
+    } catch (e) {
+      emailError = String(e);
+    }
 
-    return NextResponse.json({ ok: true });
+    return new Response(JSON.stringify({ ok: true, saved: true, emailed, emailError }), {
+      status: 200, headers: jsonHeaders(),
+    });
   } catch (err) {
-    console.error("REQUEST EMAIL ERROR:", err);
-    return NextResponse.json({ ok: false, error: "send_failed" }, { status: 500 });
+    console.error('API /request error:', err);
+    return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+      status: 500, headers: jsonHeaders(),
+    });
   }
 }
