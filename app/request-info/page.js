@@ -1,29 +1,35 @@
-import RequestForm from "./RequestForm";
-
+// app/request-info/page.js
+import RequestForm from "../../components/RequestForm";
 
 export const metadata = {
-  title: "Request Info — EgoDent Lab",
-  description: "Request price list, order form or starter materials. We reply quickly.",
+  title: "Request Info & Materials",
+  description:
+    "Tick what you need and we’ll send it by email (usually same business day).",
+  alternates: { canonical: "/request-info" },
+  openGraph: {
+    title: "Request Info & Materials",
+    description:
+      "Tick what you need and we’ll send it by email (usually same business day).",
+    url: "/request-info",
+  },
 };
 
-export default function RequestInfoPage() {
+export default function Page() {
   return (
-    <main className="container mx-auto px-4">
-      <section className="mx-auto max-w-3xl text-center my-12">
-        <p className="text-xs tracking-widest uppercase opacity-70">Service</p>
-        <h1 className="text-4xl md:text-5xl font-extrabold mt-2">Request Info & Materials</h1>
-        <p className="opacity-80 mt-3">
+    <section className="max-w-3xl mx-auto">
+      <div className="panel p-8 md:p-10 ring-1 ring-white/15">
+        <p className="mb-2 tracking-[0.2em] text-xs text-white/70">SERVICE</p>
+        <h1 className="text-4xl md:text-5xl font-extrabold leading-tight">
+          Request Info & Materials
+        </h1>
+        <p className="mt-4 text-white/85">
           Tick what you need and we’ll send it by email (usually same business day).
         </p>
-      </section>
-
-      <RequestForm />
-
-      <div className="my-10 opacity-70 text-sm">
-        <p>
-          Got a case to send? Visit <a className="underline" href="/upload-case">Upload Case</a>.
-        </p>
       </div>
-    </main>
+
+      <div className="mt-8 panel p-6 md:p-8 ring-1 ring-white/10">
+        <RequestForm />
+      </div>
+    </section>
   );
 }

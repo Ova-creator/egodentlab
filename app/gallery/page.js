@@ -1,46 +1,64 @@
-import Image from "next/image";
-import Container from "../../components/Container";
-import { sanityFetch } from "../../lib/sanity";
+// app/gallery/page.js
+import { sanityFetch, galleryQuery } from "../../lib/sanity";
+import GalleryGrid from "../../components/GalleryGrid";
 
-export const revalidate = 3600; // lăsăm Next să facă ISR
+export const revalidate = 600;
 
-const query = `
-*[_type=="galleryImage"] | order(_createdAt desc){
-  _id,
-  title,
-  "url": image.asset->url
-}
-`;
+export const metadata = {
+  title: "Gallery — Case Highlights | EgoDent Lab",
+  description:
+    "A selection of outcomes—clean margins, natural texture, stable occlusion.",
+  alternates: { canonical: "/gallery" },
+  openGraph: {
+    title: "Gallery — EgoDent Lab",
+    description:
+      "A selection of outcomes—clean margins, natural texture, stable occlusion.",
+    url: "/gallery",
+    siteName: "EgoDent Lab",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Gallery — EgoDent Lab",
+    description:
+      "A selection of outcomes—clean margins, natural texture, stable occlusion.",
+  },
+};
 
-export default async function GalleryPage() {
-  const images = (await sanityFetch(query)) || [];
+export default async function Page() {
+  const items = await sanityFetch(galleryQuery);
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "EgoDent Lab — Case Highlights",
+    hasPart: (items || []).slice(0, 12).map((it) => ({
+      "@type": "ImageObject",
+      contentUrl: it.url,
+      name: it.title || "Case photo",
+    })),
+  };
 
   return (
-    <Container>
-      <div className="text-center mt-6">
-        <p className="text-xs tracking-widest uppercase text-white/60">Gallery</p>
-        <h1 className="text-3xl md:text-4xl font-extrabold mt-2">Case Highlights</h1>
-        <p className="text-white/70 mt-2">
-          A selection of outcomes—clean margins, natural texture, stable occlusion.
+    <section className="max-w-6xl mx-auto">
+      <div className="panel p-8 md:p-10 text-center ring-1 ring-white/15">
+        <p className="tracking-[0.2em] text-xs text-white/70">GALLERY</p>
+        <h1 className="mt-2 text-4xl md:text-5xl font-extrabold leading-tight">
+          Case Highlights
+        </h1>
+        <p className="mt-5 text-white/85">
+          A selection of outcomes—clean margins, natural texture, stable
+          occlusion.
         </p>
       </div>
 
-      <div className="grid gap-6 mt-10 sm:grid-cols-2 lg:grid-cols-3">
-        {images?.map((img) => (
-          <figure key={img._id} className="panel overflow-hidden">
-            {img.url && (
-              <Image
-                src={img.url}
-                alt={img.title || "gallery image"}
-                width={1200}
-                height={900}
-                className="w-full h-auto object-cover"
-              />
-            )}
-            <figcaption className="p-3 text-sm text-white/80">{img.title}</figcaption>
-          </figure>
-        ))}
-      </div>
-    </Container>
+      {/* ✅ grila optimizată + lightbox */}
+      <GalleryGrid items={items || []} />
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+    </section>
   );
 }
