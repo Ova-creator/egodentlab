@@ -1,132 +1,151 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+
+const NEEDS_OPTIONS = [
+  'Price List',
+  'Order Form (Lab Ticket)',
+  'Starter Pack Labels',
+  'Courier Collection Setup',
+];
 
 export default function RequestForm() {
-  const [form, setForm] = useState({
-    clinic: '',
-    email: '',
-    phone: '',
-    needs: {
-      'Price List': true,
-      'Order Form (Lab Ticket)': false,
-      'Starter Pack Labels': false,
-      'Courier Collection Setup': false,
-    },
-    message: '',
-    updates: false,
-  });
+  const [clinic, setClinic]   = useState('');
+  const [email, setEmail]     = useState('');
+  const [phone, setPhone]     = useState('');
+  const [message, setMessage] = useState('');
+  const [needs, setNeeds]     = useState([]);
 
-  const [status, setStatus] = useState({
-    loading: false,
-    success: false,
-    error: null,
-    note: null,
-  });
+  const [loading, setLoading] = useState(false);
+  const [ok, setOk]           = useState(false);
+  const [error, setError]     = useState('');
 
-  const errorText = (code) => ({
-    clinic_email_required: 'Clinic and Email are required.',
-    invalid_email: 'Please enter a valid email address.',
-    network_error: 'Network error. Please try again.',
-    bad_json: 'Unexpected server response.',
-  }[code] || code);
+  // dacă vrei vreodată “minimal” pentru demo: NEXT_PUBLIC_SIMPLE_REQUEST_FORM=1
+  const simple = useMemo(
+    () => (process.env.NEXT_PUBLIC_SIMPLE_REQUEST_FORM || '0') === '1',
+    []
+  );
 
-  async function handleSubmit() {
-    if (status.loading) return;
+  const toggleNeed = (label) =>
+    setNeeds((prev) => (prev.includes(label) ? prev.filter(n => n !== label) : [...prev, label]));
 
-    // --- VALIDATION ---
-    const clinic = (form.clinic || '').trim();
-    const email = (form.email || '').trim();
-    if (!clinic || !email) {
-      setStatus({ loading: false, success: false, error: 'clinic_email_required', note: null });
-      return;
-    }
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!emailOk) {
-      setStatus({ loading: false, success: false, error: 'invalid_email', note: null });
-      return;
-    }
-
-    setStatus({ loading: true, success: false, error: null, note: null });
-
-    const payload = {
-      clinic,
-      email,
-      phone: form.phone || '',
-      needs: Object.entries(form.needs).filter(([, v]) => v).map(([k]) => k),
-      message: form.message || '',
-      website: '' // honeypot
-    };
-
+  async function onSubmit(e) {
+    e.preventDefault();
+    setLoading(true); setOk(false); setError('');
     try {
-      const res = await fetch('/api/request', {
+      const body = { clinic, email, phone, needs, message };
+      const res  = await fetch('/api/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(body),
       });
-
-      const text = await res.text();
-      let json;
-      try { json = JSON.parse(text); } catch { throw new Error('bad_json'); }
-
-      if (!res.ok || !json?.ok) {
-        throw new Error(json?.error || 'network_error');
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.ok) {
+        setOk(true); setClinic(''); setEmail(''); setPhone(''); setNeeds([]); setMessage('');
+      } else {
+        setError(data?.error || 'send_failed');
       }
-
-      setStatus({
-        loading: false,
-        success: true,
-        error: null,
-        note: json.emailed ? null : 'Saved. Email queued/temporary issue.',
-      });
-    } catch (err) {
-      setStatus({
-        loading: false,
-        success: false,
-        error: err?.message || 'network_error',
-        note: null,
-      });
+    } catch {
+      setError('network_error');
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div className="space-y-4">{/* notă: FĂRĂ <form> nativ */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <label className="block">
-          <span className="text-sm opacity-80">Clinic / Practice</span>
+    <form onSubmit={onSubmit} className="form-wrap">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="label">Clinic / Practice</label>
           <input
-            className="mt-1 w-full bg-black/20 px-3 py-2 rounded"
-            value={form.clinic}
-            onChange={e => setForm(f => ({ ...f, clinic: e.target.value }))}
+            className="input"
             placeholder="e.g. Smile Dental"
+            value={clinic}
+            onChange={(e) => setClinic(e.target.value)}
+            required
           />
-        </label>
-
-        <label className="block">
-          <span className="text-sm opacity-80">Email</span>
+        </div>
+        <div>
+          <label className="label">Email</label>
           <input
-            className="mt-1 w-full bg-black/20 px-3 py-2 rounded"
-            value={form.email}
-            onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-            inputMode="email"
+            className="input"
+            type="email"
             placeholder="name@clinic.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
           />
-        </label>
+        </div>
+
+        {!simple && (
+          <>
+            <div>
+              <label className="label">Phone</label>
+              <input
+                className="input"
+                placeholder="+44 ..."
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="label">What do you need?</label>
+              <div className="box needs">
+                {NEEDS_OPTIONS.map((opt) => (
+                  <label key={opt} className="ck">
+                    <input
+                      type="checkbox"
+                      checked={needs.includes(opt)}
+                      onChange={() => toggleNeed(opt)}
+                    />
+                    <span>{opt}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="label">Message</label>
+              <textarea
+                className="textarea"
+                placeholder="Anything specific?"
+                rows={4}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+            </div>
+          </>
+        )}
       </div>
 
-      {/* adaugă aici restul câmpurilor (phone / needs / message) dacă le vrei vizibile acum */}
+      <div className="actions">
+        <button type="submit" className="btn" disabled={loading}>
+          {loading ? 'Sending…' : 'Send request'}
+        </button>
+        {ok && <p className="msg ok">Thanks! We’ll email you shortly.</p>}
+        {!ok && error && <p className="msg err">Error: {error}.</p>}
+      </div>
 
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={status.loading}
-        className="rounded bg-white/10 hover:bg-white/20 px-4 py-2"
-      >
-        {status.loading ? 'Sending…' : 'Send request'}
-      </button>
-
-      {status.success && <p className="text-green-500 mt-2">Thanks! We’ll email you shortly.</p>}
-      {status.note && <p className="text-amber-500 mt-1">{status.note}</p>}
-      {status.error && <p className="text-red-500 mt-2">Error: {errorText(status.error)}</p>}
-    </div>
+      <style jsx>{`
+        .form-wrap { margin-top: 1rem; }
+        .label { display:block; font-size:0.9rem; margin-bottom:0.4rem; opacity:0.85; }
+        .input, .textarea {
+          width:100%; background:#1a1a1a; color:#fff; border:1px solid #333;
+          padding:0.65rem 0.8rem; border-radius:8px; outline:none;
+        }
+        .input:focus, .textarea:focus { border-color:#555; }
+        .box.needs {
+          display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+          gap:0.6rem; padding:0.75rem; background:#121212; border:1px solid #333; border-radius:10px;
+        }
+        .ck { display:flex; gap:0.5rem; align-items:center; font-size:0.95rem; }
+        .actions { display:flex; gap:1rem; align-items:center; margin-top:1rem; }
+        .btn { background:#ffffff14; color:#fff; border:1px solid #333; padding:0.6rem 1rem; border-radius:10px; }
+        .btn[disabled] { opacity:0.6; cursor:not-allowed; }
+        .msg { font-size:0.95rem; }
+        .ok  { color:#41d39e; }
+        .err { color:#ff6b6b; }
+      `}</style>
+    </form>
   );
 }
